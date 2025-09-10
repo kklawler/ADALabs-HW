@@ -1,0 +1,565 @@
+---
+title: "Data visualization using ggplot"
+author: "Kim Johnson"
+date: 
+output:
+  slidy_presentation: default
+---
+
+# Learning objectives
+
+-   Know some key principles for good data visualizations
+-   Know what ggplot is
+-   Be able to create some simple plots
+-   Understand layering principles of ggplot
+
+# Some key principles to keep in mind for good data visualizations
+
+-   “There are two goals when presenting data: convey your story and establish credibility.” — Edward Tufte
+
+1.  Tell the truth.
+2.  Know your audience.
+3.  Choose the right chart.
+4.  Emphasize the important.
+5.  Form should follow function.
+
+-   The website has many useful tips in each of these areas <https://towardsdatascience.com/the-5-most-important-principles-of-data-visualization-455225a6c4b3>
+
+# What is ggplot?
+
+-   It is a software package in R for making beautiful graphs
+-   It is beloved for its flexibility and the ability to make publication-quality graphs
+-   It adds features to your plot one at a time in layers
+-   There are some base functions for plotting in R but we are going to skip those because most everyone eventually just converts to ggplot.
+
+# Install packages and load libraries
+
+```{r}
+pacman::p_load(ggplot2, dplyr, readr)
+# The difference between ggplot and ggplot2: ggplot2 is the package we need to load, while ggplot is the function we call when making plots
+```
+
+# Building a ggplot
+
+-   The first layer of a ggplot starts with the function ggplot(), which creates the coordinate system that you can add the plot layers to
+
+# The mpg dataframe
+
+-   We are going to use the mpg dataframe from ggplot2 in this exercise that gives data for different makes and models of cars
+-   Let's put it in our environment first by assigning it the the object name mpg
+
+```{r}
+# mpg dataframe is preloaded inside the ggplot2 package, so no need to import it
+# we use assignment operator and assign the mpg dataframe as "mpg"
+# left of the assignment operator is the new name that we decide to call this dataframe
+mpg <- mpg
+
+# if you want to check varnames in the dataset
+colnames(mpg)
+names(mpg)
+str(mpg) # preferred b/c can also get var type
+
+# mpg dataframe description:
+# displ: engine displacement in liters (a measure of engine size)
+# year: year of manufacture
+# cyl: number of cylinders in the engine
+# trans: type of transmission, auto/manual
+# drv: drive type
+# cty: city miles per gallon (fuel economy)
+# hwy: highway miles per gallon (fuel economy)
+# fl: fuel type
+# class: vehicle class (e.g., compact, suv, pickup, midsize).
+```
+
+# Layer 1: Create an empty graph with ggplot
+
+-   the basic arguments of this function are data and mapping = aes()
+-   ggplot(data = NULL, mapping = aes())
+-   Here we create an empty graph to start, specifying mpg as the dataframe
+-   We have not yet specified any data from the mpg dataframe or plot type so the plot will be empty
+
+```{r}
+# ggplot() as a function
+ggplot(data = mpg) 
+```
+
+# Adding variables from a dataframe to plot
+
+-   The ggplot function and each ggplot geom function has a mapping argument that indicates which variables are mapped to which visual properties of the graph or aesthetics (aes)
+-   x and y variables are specified in the mapping argument called aes
+-   we didn't tell it what type of plot so no data is displayed yet
+
+```{r}
+ggplot(data = mpg, mapping = aes(x = displ, y = hwy)) 
+```
+
+# Layer 2: we can add a plot with mapping aes specifications and a ggplot geom function
+
+-   Note the + sign must always go at the end of the previous line before the next layer
+-   Here we use geom_point to create a plot, which is the function for a scatterplot
+
+```{r}
+ggplot(data = mpg, mapping = aes(x = displ, y= hwy)) + # layer 1: add/call ggplot() function
+  geom_point() # layer 2: add/call another function geom_point()--a scatterplot--to our layer 1
+
+# if you specify the aesthetics in the first layer, it will use these for every subsequent layer unless you specify new aes in subsequent layers. You can also use the aes function in the geom_ layers
+```
+
+# Say you want to color the points by car type, use the color argument for the third variable (car type, called class in the mpg dataframe)
+
+-   ggplot automatically assigns colors to the class of vehicle below and adds a legend
+-   the color argument should be inside of the aes function
+
+```{r}
+# different classes have different point colors
+ggplot(data=mpg, mapping = aes(x = displ, y = hwy, color = class)) +
+  geom_point()
+```
+
+# If you instead want to use size, shape, and alpha (indicator of point transparency) instead of color, you can use size, shape, and alpha arguments
+
+```{r}
+# size
+# size of bubble corresponds to alphabetic order name of class
+ggplot(data = mpg, mapping = aes(x = displ, y = hwy, size = class)) + 
+geom_point()
+
+# shape
+# note only 6 shapes max so SUV has no shape; you probably don't want to use shape to differentiate the third variable
+ggplot(data = mpg, mapping = aes(x = displ, y = hwy, shape = class)) +
+  geom_point()
+
+# alpha
+# instead of different shapes, we get different point transparencies
+ggplot(data = mpg, aes(x = displ, y = hwy, alpha = class)) +
+  geom_point()
+
+# numbers (e.g., 38;5;238m) in the warnings are color/formatting codes from your terminal, you can ignore them right now
+```
+
+# If you want to change the color of all dots, color goes **outside** of aes in the type of plot layer. If you put it inside, it won't work because in essence you are telling it the color signifies something called green
+
+```{r}
+ggplot(data = mpg, mapping = aes(x = displ, y = hwy)) +
+geom_point(color = "green") # all points will be green
+
+# not equivalent
+# inside ggplot()
+ggplot(data = mpg, mapping = aes(x = displ, y = hwy), color = "green" ) +
+geom_point()
+# here we use color = "green" as an argument to ggplot() itself, so it wont work
+
+# inside aes
+ggplot(data = mpg, mapping = aes(x = displ, y = hwy,  color = "green")) + 
+  geom_point()
+# here we use color = "green" as an argument to aes(), so it wont work either
+```
+
+# Options on shapes are provided here: <https://r4ds.had.co.nz/data-visualisation.html>
+
+# Let's do some other examples
+
+# Read in a dataset called midus from github, a dataset about health and well-being (<https://www.midus.wisc.edu/>)
+
+```{r}
+# Midlife in the US study
+midus <- read_csv("https://github.com/kijohnson/Advanced-Data-Analysis/raw/refs/heads/main/midus.csv") 
+
+# visual check of the dataset
+head(midus) # by default returns the first 6 rows
+head(midus, n = 10) # outputs the first 10 rows
+
+tail(midus)
+tail(midus, n = 10)
+```
+
+# Scatterplot with 2 continuous variables using geom_point, color each point by sex
+
+```{r}
+ggplot(data = midus, mapping = aes(x = life_satisfaction, y = self_esteem, color = sex)) +
+  geom_point() 
+
+# Warning: if any of the mapping variables (life_satisfaction, self_esteem, or sex) contain NA, ggplot2 will exclude that row from plotting.
+# In this case, we didn't set xlim()/ylim(), so "values outside the scale range" is only a generic way of ggplot saying the 946 rows are omitted
+```
+
+# Scatterplot with 2 continuous variables using geom_jitter, color each point by sex
+
+-   use jitter to add a small amount of random variation to the location of each point,
+-   this is a useful way of handling overplotting of points
+
+```{r}
+ggplot(data = midus, mapping = aes(x = life_satisfaction, y = self_esteem, color = sex)) +
+  geom_jitter() 
+```
+
+# Add a trend line with geom_smooth, this goes outside of the aes function as does the color I want my trendline to be
+
+```{r}
+ggplot(data = midus) +
+  geom_jitter(mapping = aes(x = life_satisfaction, y = self_esteem, color = sex)) +
+  geom_smooth(mapping = aes(x = life_satisfaction, y = self_esteem), method = "lm", color = "red")
+ 
+# OR put the x and the y in the first layer to reduce repetition and then these will be applied by default to all layers - BEST WAY TO DO IT
+ggplot(data = midus, mapping = aes(x = life_satisfaction, y = self_esteem)) +
+  geom_jitter(mapping = aes(color = sex)) +
+  geom_smooth(method = "lm", color = "red")
+
+# gray shades (default): 95% CI
+ggplot(data = midus, mapping = aes(x = life_satisfaction, y = self_esteem)) +
+  geom_jitter(mapping = aes(color = sex)) +
+  geom_smooth(method = "lm", color = "red", se = FALSE) # add se = FALSE to remove the 95% CI
+
+# Question: what does se stand for? How is it related to 95% CI?
+```
+
+# Histogram (1 continuous variable)
+
+-   Display the counts with bars for self-esteem
+
+```{r}
+ggplot(data = midus, mapping = aes(x = self_esteem)) +
+  geom_histogram() 
+
+# Change binwidth and color
+ggplot(data = midus, mapping = aes(x = self_esteem)) +
+  geom_histogram(binwidth = 2, color = "black", fill = "blue") # bindwidth is the number of units covered by a bin
+
+# can add "boundary = 0" to force ggplot to start from 0
+ggplot(data = midus, mapping = aes(x = self_esteem)) +
+  geom_histogram(binwidth = 2, color = "black", fill = "blue", boundary = 10)
+
+# Add a line with geom_vline where the mean is using geom_vline
+ggplot(data = midus, mapping = aes(x = self_esteem)) +
+  geom_histogram(binwidth = 1, color = "black", fill = "blue") + 
+  geom_vline(aes(xintercept = mean(self_esteem, na.rm = TRUE)), color="red") # na.rm = TRUE: remove NAs when alculating the mean
+```
+
+# Barplots (1 categorical variable): geom_bar
+
+-   Geom_bar uses count as default for the y-axis.
+-   This gives you the same information as the table() function
+
+```{r}
+table(midus$heart_self, useNA = "always")
+
+ggplot(data = midus, mapping = aes(x = heart_self)) +
+  geom_bar() 
+```
+
+# Ordering a factor
+
+-   If your variable is a character variable, it's going to be ordered alphabetically on the plot. If you want a different order, you must use a factor variable.
+-   You can use the levels() function to check the order and then plot.
+
+```{r}
+# look at class of variable
+class(midus$heart_self)
+
+# factor the variable and assign the order using the levels argument 
+midus$heart_self <- factor(midus$heart_self, levels = c("Yes", "No")) # factor so Yes column comes first instead of second
+
+# check levels
+levels(midus$heart_self) 
+str(midus$heart_self)
+```
+
+# Plot the barplot again with the new levels
+
+```{r}
+ggplot(data = midus) +
+  geom_bar(aes(x = heart_self,  fill = heart_self))  # added fill to give colors
+
+# move aes() to ggplot() layer 1
+ggplot(data = midus, aes(x = heart_self,  fill = heart_self)) +
+  geom_bar()
+```
+
+## Barplots (2 categorical variables): geom_bar
+
+-   what if I wanted to look at the counts by heart_father?
+
+```{r}
+# stacked bars
+ggplot(data = midus) + 
+  geom_bar(position = "stack", aes(x = heart_self, fill = heart_father)) # the fill and the position gives the stacking
+
+## can also move aes() to layer 1
+ggplot(data = midus, aes(x = heart_self, fill = heart_father)) + 
+  geom_bar(position = "stack")
+
+
+# side by side bars 
+ggplot(data = midus) + 
+  geom_bar(position = "dodge",  aes(x = heart_self, fill = heart_father)) # the fill and the dodge gives the bars beside one another
+
+# proportions instead of counts
+ggplot(data = midus) +
+  geom_bar(position = "fill", aes(x = heart_self, fill = heart_father)) 
+```
+
+## Boxplots: geom_boxplot
+
+```{r}
+ggplot(data = midus, mapping = aes(x = heart_self, y = life_satisfaction)) +
+  geom_boxplot() 
+# Q1 (25 percentile), Q2 (median), Q3 (75 percentile), IQR
+# whiskers (vertical line)--1.5 IQR
+# outliers (exceeds 1.5 IQR)
+
+# draw mean and median using stat_summary function as 3rd and 4th layers
+ggplot(data = midus, mapping = aes(x = heart_self, y = life_satisfaction)) +
+  geom_boxplot() + 
+   stat_summary(fun = mean, geom = "point", shape = 23, color = "red")+ # add the mean
+   stat_summary(fun = median, geom = "point", shape = 2, color = "blue") # add median
+```
+
+## Editing text elements in the plot
+
+-   add labels and annotate plot
+
+```{r}
+ggplot(data = midus, mapping = aes(x = BMI, y = self_esteem)) +
+  geom_point(mapping = aes(color = sex)) +
+  labs(x = "Body Mass Index (BMI)",                  # x-axis title
+       y = "Self-Esteem",                            # y-axis title
+       title = "Scatterplot of BMI by Self-Esteem",  # figure title
+       subtitle="This is a subtitle",                # figure subtitle
+       caption="Source of the data") +               # caption (source of the data)
+  annotate(geom = "text", x = 70, y = 50, label = "text you want to add") # other text 
+```
+
+-   you can also include a rectangle annotation by setting the geom in the annotate function to "rect" and "drawing" the rectangle with xmin, xmax, ymin, and ymax
+-   for other geom options: <https://ggplot2.tidyverse.org/reference/annotate.html>
+
+```{r}
+# from here we save the plot as an object named "g", and when later on I can add more layers to it
+g <- ggplot(data = midus, aes(x = BMI, y = self_esteem)) +
+  geom_point(aes(color = sex)) +
+  labs(x = "Body Mass Index (BMI)",                  # x-axis title
+       y = "Self-Esteem",                            # y-axis title
+       title = "Scatterplot of BMI by Self-Esteem",  # figure title
+       subtitle="This is a subtitle",                # figure subtitle
+       caption="Source of the data") +               # caption (source of the data)
+  annotate(geom = "rect", xmin = 30, xmax = 40, ymin = 20, ymax = 30,
+  alpha = 0.4, color="red", fill="blue") # add rectangle
+
+g
+```
+
+## Adding a theme to your plot
+
+-   White background with grid lines: theme_bw as a layer
+
+```{r}
+g <- ggplot(data = midus, mapping = aes(x = BMI, y = self_esteem)) +
+  geom_point(mapping = aes(color = sex)) +
+  labs(x = "Body Mass Index (BMI)",                  # x-axis title
+       y = "Self-Esteem",                            # y-axis title
+       title = "Scatterplot of BMI by Self-Esteem",  # figure title
+       subtitle="This is a subtitle",                # figure subtitle
+       caption="Source of the data") +               # caption (source of the data)
+  annotate(geom = "rect", xmin = 30, xmax = 40, ymin = 20, ymax = 30,
+  alpha = 0.4, color="red", fill="blue") +  # add rectangle
+  theme_bw()
+# overwrite of g
+
+g
+```
+
+-   White background with no grid lines: theme_classic
+-   Here I save the plot as an object called g so I can easily add additional layers to it later
+
+```{r}
+g <- ggplot(data = midus, mapping = aes(x = BMI, y = self_esteem)) +
+  geom_point(mapping = aes(color = sex)) +
+  labs(x = "Body Mass Index (BMI)",                  # x-axis title
+       y = "Self-Esteem",                            # y-axis title
+       title = "Scatterplot of BMI by Self-Esteem",  # figure title
+       subtitle="This is a subtitle",                # figure subtitle
+       caption="Source of the data") +               # caption (source of the data)
+  annotate(geom = "rect", xmin = 30, xmax = 40, ymin = 20, ymax = 30,
+  alpha = 0.4, color="red", fill="blue") +  # add rectangle
+  theme_classic()
+g
+```
+
+-   Legends: hide legend or place legend at "bottom", "top", "left", or "right"
+-   Note theme can be used to "tweak" the display of an existing theme or used to manually set the plot display
+
+```{r}
+# hide legend
+g + theme(legend.position = "null") # use theme function with legend.position = "null"
+g 
+
+# place legend at bottom 
+g + theme(legend.position = "bottom") # overwrites previous theme legend position
+```
+
+# What if you like a theme, but you still want to make changes? like:
+
+-   get rid of minor grid lines
+-   change the line type and color of axis lines
+-   remove the title of your legend
+-   center the title and subtitle
+-   make a black box around your legend, and fill it with the color gray
+-   You can add another **theme()** layer that includes arguments with your specific changes. Theme arguments and options can be found in help when you search theme. There a so many! A sample is shown here.
+
+# tweaking the plot with theme
+
+```{r}
+h <- g + theme(panel.grid.major =  element_line(color = NA),                             # get rid of minor grid lines
+            axis.line = element_line(colour = "darkblue", size = 1, linetype = "solid"), # change the line type and color of axis lines
+            legend.title = element_blank(),                                              # remove the title of your legend
+            plot.title = element_text(hjust = 0.5),                                      # center the title 
+            plot.subtitle = element_text(hjust = 0.5),                                   # center the subtitle
+            legend.background = element_rect(color = "black", fill = "gray"))            # make a black box around your legend, and fill it with the color gray            
+
+h
+
+# print g to compare
+g
+```
+
+# Playing with color
+
+-   R color palettes are useful when you have a TON of data and want to maximize differences between colors (or you want to use colors that are colorblind friendly). Or maybe you just don't like the default colors.
+-   If you want to play around, you can load the `RColorBrewer` package.
+
+```{r }
+# install.packages("RColorBrewer")
+library(RColorBrewer)
+
+# Find the Palette that you like. Look up help page for
+# display.brewer.all() to learn more about the different types
+display.brewer.all()
+
+# We can add a new LAYER to specify the color palette
+ggplot(data = midus, aes(x = self_esteem, y = life_satisfaction)) + # Layer 1
+  geom_point(aes(color = heart_self, shape = heart_self)) + # Layer 2
+  labs(x = "Self-Esteem", y = "Life Satisfaction", # Layer 3
+       title = "Color Palettes") +
+  scale_color_brewer(palette = "Accent") # Layer 4
+```
+
+-   manually setting colors
+
+```{r }
+ggplot(data = midus, aes(x = self_esteem, y = life_satisfaction)) + # Layer 1
+  geom_point(aes(color = heart_self, shape = heart_self)) + # Layer 2
+  labs(x = "Self-Esteem", y = "Life Satisfaction", # Layer 3
+       title = "Color Palettes") +
+  scale_color_manual(values = c("purple", "green")) # Layer 4
+
+# number of values in scale_color_manual should always match the number of levels of the color = variable (i.e., heart_self)
+```
+
+-   There are TONS of color palettes. Some are great, some are kind of ridiculous. For example, there are Wes Anderson themed palettes! To view them, click [here](https://github.com/karthik/wesanderson#wes-anderson-palettes).
+
+# Faceting
+
+-   Faceting lets you break up your plot into multiple sub-plots. Within facet, read the **\~** as "by".
+
+# facet_grid function
+
+-   Especially great when you have multiple factors to separate on.
+
+-   Like the name implies, `facet_grid` is going to make a grid. Just like a matrix, the right hand side is rows and the left hand side is columns (i.e., 2x3 matrix = 2 rows and 3 columns). You can put your factor on either side, but that will change the layout of your grid! For example:
+
+-   `~ sex` is read as "by sex", and is in the column position. The result is a 1x2 grid. There are 2 columns because `sex` has 2 levels.
+
+-   `sex ~` is read as "sex by". This doesn't work! You need something else. To indicate that you do not want to facet by any additional factor, use the `.`. So the correct syntax for faceting `sex` in the row position is `sex ~ .`. The result will be a 2x1 grid.
+
+# Plot 1 = 1 variable to separate on, facet along columns
+
+```{r}
+ggplot(data = midus, aes(x = BMI, y = life_satisfaction)) +
+  geom_point(aes(color = sex, shape = sex)) + 
+  labs(x = "Body Mass Index (BMI)", y = "Life Satisfaction",
+       title = "Facet_Grid: Plot 1a",
+       subtitle = "facet along columns") +
+  facet_grid(~ sex) # can also use facet_grid(.~ sex) here
+
+# a little quirk for ggplot2: Left side (rows): dot is optional; Right side (columns): dot is required
+```
+
+# Plot 2 = 1 variable to separate on, facet along rows
+
+```{r}
+ggplot(data = midus, aes(x = BMI, y = life_satisfaction)) +
+  geom_point(aes(color = sex, shape = sex)) + 
+  labs(x = "Body Mass Index (BMI)", y = "Life Satisfaction",
+       title = "Facet_Grid: Plot 1b",
+       subtitle = "facet along rows") +
+  facet_grid(sex ~ .)
+```
+
+# Plot 3 = 2 variables to separate on, facet along rows
+
+```{r}
+ggplot(data = midus, aes(x = BMI, y = life_satisfaction)) +
+  geom_point(aes(color = sex, shape = sex)) + 
+  labs(x = "Body Mass Index (BMI)", y = "Life Satisfaction",
+       title = "Facet_Grid: Plot 1c",
+       subtitle = "facet along rows") +
+  facet_grid(sex ~ heart_self) # row is separated by sex; column is separated by heart_self
+```
+
+# Arranging multiple plots: ggarrange
+
+-   Let's say you have 3 different, independent plots that you want to arrange into a cohesive figure. You're arranging a grid of plots. The package called `ggpubr` and the function is `ggarrange()`.
+
+-   Importantly, you need to STORE these plots to your environment first (which means it won't immediately appear when you run the code). Then you can arrange the plots based on the name you assigned it.
+
+```{r arrangingPlots, message=FALSE}
+# install.packages("ggpubr")
+library(ggpubr)
+
+# First, create your plots! If you want to have a single legend for every plot (ex: the colors are the same for all plots), then make sure your plots are coded accordingly. Then, ggarrange
+
+# plot A - scatter plot
+plotA <- ggplot(data = midus, mapping = aes(x = hostility, y = life_satisfaction)) +
+  geom_point(aes(color = sex)) +
+  theme_minimal() +
+  labs(title = "Scatter Plot")
+plotA
+
+# plot B - histogram
+plotB <- ggplot(data = midus, mapping = aes(x = life_satisfaction)) +
+  geom_histogram(binwidth = .1, aes(fill = sex), alpha = .7) +
+  theme_minimal() +
+  labs(title = "Histogram")
+plotB
+
+# plot C - box plot
+plotC <- ggplot(data = midus, mapping = aes(x = sex, y = life_satisfaction)) +
+  geom_boxplot(aes(fill = sex)) +
+  theme_minimal() +
+  labs(title = "Boxplot")
+plotC
+
+# Second, ggarrange
+combined_plot <- ggarrange(plotA, plotB, plotC, nrow = 2, ncol = 2, 
+          common.legend = TRUE, 
+          labels = c("A", "B", "C"), legend = "bottom")
+# print the combined plot
+combined_plot
+```
+
+# Exporting your plots: ggsave
+
+```{r}
+ggsave(filename = "plotSaveTest.pdf", plot = combined_plot,
+       width = 4, height = 4, units = "in", bg = "white") 
+
+ggsave(filename = "PlotC.png", plot = plotC,
+       width = 4, height = 4, units = "in", bg = "white") 
+
+# note if you do not specify the plot argument it will default to the last saved plot (i.e.g, the last plot that was shown)
+
+
+# by default, the plots will be saved to the directory of this rmd file
+# to change directory:
+ggsave(filename = "/Users/ckck/Desktop/PlotC_desktop.png",
+       plot = plotC, width = 4, height = 4, units = "in", bg = "white")
+```
