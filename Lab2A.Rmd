@@ -1,0 +1,104 @@
+---
+title: "Lab2A"
+author: "KatieLawler"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+#loading packages
+```{r}
+pacman::p_load(tidyverse, readr, table1, DiagrammeR, rsvg)
+
+```
+
+#loading data
+```{r}
+midus <- read_csv("https://github.com/kijohnson/Advanced-Data-Analysis/raw/refs/heads/main/midus.csv") 
+head(midus)
+
+```
+
+# drop missing data in BMI 
+```{r}
+midus1 <- midus %>%
+  drop_na(BMI) 
+
+#checking 
+head(midus1)
+```
+
+#How many observations are left?
+
+```{r}
+ex1 <- nrow(midus) - nrow(midus1) #comparing data with changed dataset
+ex1
+```
+
+#Drop observations with missing data on heart_self
+
+```{r}
+midus2 <- midus1 %>%
+  drop_na(heart_self) 
+
+```
+
+#How many observations are left?
+
+```{r}
+ex2 <- nrow(midus1) - nrow(midus2) #comparing data with changed dataset
+ex2
+```
+
+#Drop observations with missing data on heart_father
+
+```{r}
+midus3 <- midus2 %>%
+  drop_na(heart_father) 
+
+```
+
+#How many observations are left?
+```{r}
+ex3 <- nrow(midus2) - nrow(midus3) #comparing data with changed dataset
+ex3
+```
+
+# Make a figure 1 that includes four boxes: 1) Starting dataframe number of observations, 2) Number of observations dropped and left after excluding observations with missing data on BMI, 3) Number of observations dropped and left after excluding observations with missing data on heart-self, 4) Number of observations dropped and left after excluding observations with missing data on heart_father.
+
+```{r}
+# note in this function all text is green but you can still comment out text with hashtags
+# for more information on grViz that uses the "DOT" language, see: https://rich-iannone.github.io/DiagrammeR/articles/graphviz-mermaid.html
+
+grViz(diagram = "digraph flowchart{ # gives beginning of flowchart
+
+      # node definitions with substituted label text
+      
+      node [fontname = Times, shape = rectangle, fontsize = 15] 
+      
+      # Define the nodes: nodes indicate how many boxes you will have in your diagram. Since I have three sets of exclusions, I will have four nodes.
+      
+      node1 [label = '@@1'] # starting number
+      node2 [label = '@@2'] # number after exclusion 1
+      node3 [label = '@@3'] # number after exclusion 2
+      node4 [label = '@@4'] # number after exclusion 3
+      
+      # edge definitions with the node IDs are used to indicate how the rectangle boxes flow from each other. 
+      
+      node1 -> node2 -> node3 -> node4
+}
+      # This set of code provides the text in each rectangle box.
+      [1]: 'Records received from MIDUS n = 4,963'
+      [2]: 'Excluding individuals with missing BMI data n = 1149'
+      [3]: 'Excluding individuals with missing Heart_Self data n = 7'
+      [4]: 'Excluding individuals with missing Heart_Father data n = 26'
+      ")
+```
+
+
+#  Make a Table 1 that gives the characteristics of participants in the analytic dataset (the final dataset after all exclusions). The column variable should include heart_self and the row variables should include age, BMI, and heart_father.
+
+```{r}
+table1(~ age + BMI + heart_father|heart_self, midus3)
+```
+
