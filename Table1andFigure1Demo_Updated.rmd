@@ -1,0 +1,318 @@
+---
+title: "Figure 1 and Table 1 demonstration"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+---
+
+# Install packages and open libraries
+
+```{r}
+# install.packages("pacman")
+
+pacman::p_load(tidyverse, readr, table1, DiagrammeR, rsvg)
+# tidyverse is for data management, including multiple common R packages such as dplyr, ggplot2, etc.
+# readr is for reading in the csv file
+# DiagrammeR is for generating Figure 1
+# table1 is for generating table 1
+# rsvg for exporting figure 1
+```
+
+# load data for this exercise
+
+-   this is data from the Surveillance, Epidemiology, and End Results program on cervical cancer diagnoses from 2004 to 2015
+-   there are 41,295 observations
+
+```{r}
+cerv <- read_csv("SEERcerv2004to2015.csv")
+
+# dataset visualization
+head(cerv) #first 6 rows
+str(cerv) #colnames, type of var, 
+
+```
+
+# Data management for variables used in this demo (stage_f, event_f, and insurance_f, surv_mo, age)
+
+-   look at column names
+
+```{r}
+colnames(cerv)
+```
+
+-   provide shorter names for variables
+
+```{r}
+# rename
+names(cerv) <- c("ID", "age_category","yr_dx", "sex", "race",
+                 "insurance", "marital", "%pov", "%edu", "cause_spec_death", 
+                 "first_primary", "surv_mo", "vital_stat", "Stage") 
+colnames(cerv)
+
+# rename for a single column
+colnames(cerv)[colnames(cerv) == "ID"] <- "ID Number"
+colnames(cerv)
+
+colnames(cerv)[colnames(cerv) == "ID Number"] <- "ID" # change it back if you want
+```
+
+-   conduct some data management
+
+```{r}
+cerv <- cerv %>% # %>%: pipe operator to pass the result of one expression into the next function call
+         # Recode stage variable "Stage" as a new factor variable "stage_f" and label it with new levels (or groups)
+  mutate(stage_f = case_when(Stage %in% c("IA","IA1","IA2","IB","IB1","IB2","INOS") ~ "Stage I", 
+                             Stage %in% c("IIA","IIB","IINOS") ~ "Stage II",
+                             Stage %in% c("IIIA","IIIB","IIINOS") ~ "Stage III",
+                             Stage %in% c("IVA","IVB","IVNOS") ~ "Stage IV"),
+         stage_f = factor(stage_f, levels = c("Stage I","Stage II","Stage III","Stage IV")),
+         
+         # Recode cause specific death as 1/0 if the person died/did not die of cervical cancer 
+         event_f = case_when(cause_spec_death == "Dead (attributable to this cancer dx)" ~ 1,
+                           cause_spec_death %in% c("Alive or dead of other cause", "N/A not first tumor") ~ 0),
+         
+         # Recode insurance status as a factor variable and label it
+         insurance_f = factor(insurance, levels = c("Insured", "Insured/No specifics", "Any Medicaid", "Uninsured")),
+         
+         # Convert survival months to numeric variables
+         surv_mo = as.numeric(surv_mo),
+         
+         # Convert age to numeric variables
+         # Note: those who were 85+ were coded as 85 in the dataset
+         age = parse_number(age_category))
+
+# Check variables for correct categorization 
+table(cerv$Stage, cerv$stage_f, useNA = "always")
+table(cerv$insurance, cerv$insurance_f, useNA = "always")
+
+
+# Difference between = and ==
+## Use = when setting function arguments (similar to <- )
+x = 5
+x <- 5
+## Use == when comparing values 5
+5 == 5 # whether 5 is equal to 5
+5 == 6
+```
+
+# Figure 1 Proccess
+
+-   Let's next make a figure 1 that shows exclusions to arrive at your analytic dataset
+-   We can do this with a package called DiagrammeR and the function grViz.
+-   An example of this for the cerv dataset is shown below
+
+# First we will make the following exclusions one at a time
+
+-   Exclusion 1 diagnosis years before 2007 the latest year the insurance variable is available
+
+```{r}
+cerv1 <- cerv %>%
+  filter(yr_dx>2006) 
+
+# check how many rows/patients we have filtered out
+ex1 <- nrow(cerv) - nrow(cerv1) #comparing data with changed dataset
+ex1
+```
+
+-   Exclusion 2 those with missing data on insurance status
+
+```{r}
+cerv2 <- cerv1 %>%
+  drop_na(insurance_f) 
+
+ex2 <- nrow(cerv1) - nrow(cerv2)
+ex2
+```
+
+-   Exclusion 3 those with missing data on stage at diagnosis
+
+```{r}
+cerv3 <- cerv2 %>%
+  drop_na(stage_f) 
+
+ex3 <- nrow(cerv2) - nrow(cerv3) 
+ex3
+```
+
+# Let's use the grViz function from the DiagrammeR package to make a flow chart of how we arrived at our analytic dataframe
+
+```{r}
+# note in this function all text is green but you can still comment out text with hashtags
+# for more information on grViz that uses the "DOT" language, see: https://rich-iannone.github.io/DiagrammeR/articles/graphviz-mermaid.html
+
+grViz(diagram = "digraph flowchart{ # gives beginning of flowchart
+
+      # node definitions with substituted label text
+      
+      node [fontname = Times, shape = rectangle, fontsize = 15] 
+      
+      # Define the nodes: nodes indicate how many boxes you will have in your diagram. Since I have three sets of exclusions, I will have four nodes.
+      
+      node1 [label = '@@1'] # starting number
+      node2 [label = '@@2'] # number after exclusion 1
+      node3 [label = '@@3'] # number after exclusion 2
+      node4 [label = '@@4'] # number after exclusion 3
+      
+      # edge definitions with the node IDs are used to indicate how the rectangle boxes flow from each other. 
+      
+      node1 -> node2 -> node3 -> node4
+}
+      # This set of code provides the text in each rectangle box.
+      [1]: 'Records received from SEER for cervical cancer diagnoses n = 41,295'
+      [2]: 'Excluding 10,343 individuals diagnosed before 2007 n = 30,952'
+      [3]: 'Excluding 1,488 individuals with missing data on insurance status n = 29,464'
+      [4]: 'Excluding 1,985 individuals with missing data on stage at diagnosis n = 27,479'
+      ")
+```
+
+# Suppose we also conduct an analysis on survival where we don't need to exclude those with missing stage at diagnosis
+
+-   we can use branching to do this
+
+# first let's make another dataframe that excludes those with diagnoses before 2007, with missing data on insurance status, and with missing data on survival time (survmo)
+
+```{r}
+cerv4 <- cerv2 %>%
+  drop_na(surv_mo) # cerv4 n = 29,453; cerv2 n = 29464
+
+ex4 <- nrow(cerv2) - nrow(cerv4)
+ex4
+```
+
+# With branching
+
+```{r}
+grViz("digraph flowchart {
+     
+      node [fontname = Helvetica, shape = rectangle, fontsize = 15] 
+      
+      node1 [label = '@@1']
+      node2 [label = '@@2']
+      node3 [label = '@@3']
+      node4 [label = '@@4']
+      node5 [label = '@@5']
+      
+      node1 -> node2 -> node3 
+      node3 -> node4 # branching
+      node3 -> node5 # branching
+}
+      [1]: 'Records received from SEER for cervical cancer diagnoses n = 41,295'
+      [2]: 'Excluding 10,343 individuals diagnosed before 2007 n = 30,952'
+      [3]: 'Excluding 1,488 individuals with missing data on insurance status n = 29,464'
+      [4]: 'Excluding 1,985 individuals with missing data on stage at diagnosis n = 27,949'
+      [5]: 'Excluding 11 individuals with missing data on survival n = 29,453'
+      ")
+
+```
+
+# Wrapping text in last boxes with \\n
+
+```{r}
+# Note I attach to an object called figure 1 for exporting below
+figure1 <- grViz("digraph flowchart {
+     
+      node [fontname = Helvetica, shape = rectangle, fontsize=15] 
+      
+      node1 [label = '@@1']
+      node2 [label = '@@2']
+      node3 [label = '@@3']
+      node4 [label = '@@4']
+      node5 [label = '@@5']
+      
+      node1 -> node2 -> node3 
+      node3 -> node4 # branching
+      node3 -> node5 # branching
+}
+      [1]: 'Records received from SEER for cervical cancer diagnoses n = 41,295'
+      [2]: 'Excluding 10,343 individuals diagnosed before 2007 n = 30,952'
+      [3]: 'Excluding 1,488 individuals with missing data on insurance status n = 29,464'
+      [4]: 'Excluding 1,985 individuals with missing data on \\n stage at diagnosis n = 27,949'
+      [5]: 'Excluding 11 individuals with missing data \\n on survival n = 29,453'
+      ")
+figure1
+```
+
+# export figure
+
+```{r}
+figure1 %>%
+  DiagrammeRsvg::export_svg() %>% # convert to SVG format
+  charToRaw() %>% # converts SVG text string into binary format
+  rsvg::rsvg_pdf("Figure 1.pdf") # the output file is named as "Figure 1"
+```
+
+
+
+#TABLE 1 !!!!!
+
+# Creating a Table 1 using the table1 function.
+
+-   Let's say we want to ask a question about how the exposure health insurance status is associated with cervical cancer survival, we will want to create a table that shows characteristics of the study population overall and by insurance status.
+
+-   For this type of question, it is typical to present demographic variables as well as any important predictors of vital status (e.g. like stage at diagnosis for cancer) as row variables.
+
+-   The table1 function has a formula structure where the row variables follow the tilda (\~)
+
+-   N's and frequencies are provided for factor and character variables. Means, SD's and Medians and the range are provided for numerical variables
+
+-   Let's just do an overall table first before stratifying results on insurance status
+
+```{r}
+table1(~ age + sex + race + stage_f  + surv_mo + vital_stat, cerv3) # we are using the analytic dataframe for stage
+```
+
+-   by insurance status (use the `|` character to indicate by)
+
+```{r}
+table1(~ age + race + stage_f  + surv_mo + vital_stat|insurance_f, cerv3) 
+```
+
+# Adding labels to the variables because the raw variables are not publication-quality. This is important in producing a high-quality table.
+
+```{r}
+label(cerv3$age) <- "Age (years)"
+label(cerv3$sex) <- "Sex"
+label(cerv3$race) <- "Race"
+label(cerv3$insurance_f) <- "Insurance at diagnosis"
+label(cerv3$stage_f) <- "Stage at diagnosis"
+label(cerv3$surv_mo) <- "Survival time (months)"
+label(cerv3$vital_stat) <- "Vital Status"
+
+table1(~ age + sex + race  + stage_f  + surv_mo + vital_stat|insurance_f, cerv3)
+```
+
+# Adding a label to the overall column "Total" with the overall argument
+
+```{r}
+table1(~ age + sex + race + stage_f  + surv_mo + vital_stat|insurance_f, overall = "Total", cerv3)
+```
+
+# Adding a 'Variable' label to the first column with the rowlabelhead argument
+
+```{r}
+table1(~ age + sex + race   + stage_f  + surv_mo + vital_stat|insurance_f, overall = "Total", rowlabelhead = "Variable", cerv3)
+```
+
+# Adding a footnote to the table with the footnote argument
+
+```{r}
+table1(~ age + sex + race  + stage_f  + surv_mo + vital_stat|insurance_f, overall = "Total", footnote = 'SD = standard deviation', cerv3)
+```
+
+# Table interpretations (please read over and make sure you understand these interpretations)
+
+-   Age: Those who were uninsured and who had any Medicaid were younger on average than those who were insured with mean ages of 47.9 (sd=11.6), 48.7 (sd=13.9), and 50.3 (sd=14.7) respectively. Those who were uninsured and who had any Medicaid had median ages that were similar to those who were privately insured at diagnosis, with median ages of 48.
+
+-   Race: A higher percentage of those who were uninsured and who had Any Medicaid were Hispanic and Non-Hispanic Blacks than those who were privately insured at diagnosis (Hispanic: 35.1%, 33.3% vs. 15.3%; Non-Hispanic Black: 18.5%, 16.5% vs. 10.8%). The opposite pattern was observed for Non-Hispanic Whites with a lower percentage being reported as uninsured and having Any Medicaid vs. privately insurance at diagnosis (39.7%, 38.3% vs. 63.3%).
+
+-   Stage at diagnosis: A higher percentage of those who were uninsured and who had Any Medicaid were diagnosed at Stage IV vs. those who had private insurance (19.4%, 18.1% vs. 13.3%). Conversely, a higher percentage of those with private insurance were diagnosed at Stage I than those who were uninsured and who had Any Medicaid at diagnosis (54.7% vs. 40.2%, 40.2%)
+
+-   Survival time: The median survival time for cervical cancer was greatest for those with private insurance (42 months), followed by those with Any Medicaid (30 months), and those without insurance (28 months). The mean survival time for cervical cancer was greatest for those with private insurance (48.3 +/- 34.2 months), followed by those with Any Medicaid (39.5 +/- 32.1 months), and those without insurance (38.3 +/- 33.4 months).
+
+-   Vital status: A higher percentage of individuals who were uninsured and who had Any Medicaid at diagnosis died during the study period than those with private insurance (37.6%, 37.3% vs. 28.3%).
+
+# How do I get this table into word?
+
+-   copy/paste
+-   Knit to html and then copy/paste
