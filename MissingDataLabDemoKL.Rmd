@@ -1,0 +1,178 @@
+---
+title: "Missing Data LaB Demo"
+author: "KatieLawler"
+date: '`r Sys.Date()`'
+output: html_document
+---
+```{r}
+library(xml2)
+library(haven)
+
+html_doc <- read_html("/Users/maryklawler/Desktop/ADALabs&HW/Missing-data-lab.html")
+```
+
+
+#Hypothetical question we are asking: Is income associated with BMI?
+
+#1. Install packages and open libraries needed for importing data, managing data, and for imputations (code given).
+```{r}
+pacman::p_load(haven, tidyverse, naniar, VIM, mice, lattice, table1)
+```
+
+#2. Import the first 10000 rows of LLCP2021.XPT (we are only importing 10K rows so everything is faster). Hints: the BRFSS file name has a space after the .XPT; use the read_xpt function (haven package); using help, look-up the argument for importing a set number of rows (code given).
+
+```{r}
+BRFSS2021 <-
+  read_xpt('/Users/maryklawler/Desktop/LLCP2021.XPT ', n_max=10000)
+
+
+
+```
+
+#3. Select the following variables (“MEDCOST1”, “MARITAL”, “EMPLOY1”, “_SEX”, “_EDUCAG”, “_IMPRACE”, “_AGE80”, “_EDUCAG”, “_INCOMG1”, “_BMI5”) to create a smaller dataframe for missing data imputation. Rename variables (code given).
+```{r}
+# select variables of interest
+df<-BRFSS2021 %>%
+  select("MEDCOST1", "MARITAL", "EMPLOY1", "_SEX", "_EDUCAG",  "_IMPRACE", "_AGE80",  "_INCOMG1", "_BMI5") 
+
+# rename variables
+names(df) <- c("medical_cost", "marital", "employed", "sex", "education", "race", "age", "income", "bmi")
+```
+
+
+#4. Replace 7 and 9’s as appropriate with NAs (see codebook). Conduct data management for variables (code given).
+```{r}
+df <- replace_with_na(df, replace = list(
+                               medical_cost = c(7,9),
+                               marital = c(9),
+                               employed = c(9),
+                               sex = c(7,9),
+                               education = c(9),
+                               race = c(7,9),
+                               income = c(9)))
+
+df$medical_cost <- factor(df$medical_cost, levels = c(1,2), labels = c("Yes", "No"))
+df$marital <- factor(df$marital, levels = c(1:6), labels = c("Married", "Divorced", "Widowed", "Separated", "Never married", "A member of an unmarried couple"))
+df$employed <- factor(df$employed, levels = c(1:8), labels = c("Employed for wages", "Self-employed","Out of work for 1 year or more","Out of work for < 1 year", "A homemaker","A student", "Retired", "Unable to work"))
+df$sex <- factor(df$sex, levels = c(1:2), labels = c("Male", "Female"))
+df$education <- factor(df$education, levels = c(1:4), labels = c("Did not graduate High School", "Graduated High School","Attended College or Technical School","Graduated from College or Technical School"))
+df$race <- factor(df$race, levels = c(1:6), labels = c("White, Non-Hispanic","Black, Non-Hispanic","Asian, Non-Hispanic","American Indian/Alaskan Native, Non-Hispanic","Hispanic","Other race, Non-Hispanic"))
+df$income <- factor(df$income, levels = c(1:7), labels =  c("Less than $15,000", "$15,000 to < $25,000", "$25,000 to < $35,000", "$35,000 to < $50,000", "$50,000 to < $100,000", "$100,000 to < $200,000", "$200,000 or more"))
+
+table(df$medical_cost, useNA = "always")
+table(df$marital, useNA = "always")
+table(df$sex, useNA = "always")
+table(df$employed, useNA = "always")
+table(df$education, useNA = "always")
+table(df$race, useNA = "always")
+table(df$income,  useNA = "always")
+```
+
+
+#5. Understanding the data
+
+
+#a. Get a summary of each variable in the dataframe to determine how much missing data there is for each variable (code given).
+```{r}
+summary(df)
+```
+
+#b. Create a variable for missing BMI (bmi_miss) our outcome of interest (code given).
+```{r}
+df$bmi_miss <- ifelse(is.na(df$bmi), 1, 0)
+
+# check new variable
+table(df$bmi_miss)
+```
+
+
+#c. Use the table1 function (code provided below to examine differences between those with missing data and those without missing data) (code given). Comment on what differences you see.
+```{r}
+# Run a table 1 to look at differences on other variables between those with missing and non-missing BMI
+table1(~medical_cost + age + employed + sex + education + race + income|bmi_miss, df)
+```
+
+#5. Examine missing data patterns using md.pattern. What variable has the most missing data? Which has the least? How many people have the following missing data pattern–complete on all variables except medical_cost and income?
+```{r}
+md.pattern(df, rotate.names=TRUE)
+```
+#5. Answer: Martial Status is missing most data; sex/race/agebmi are missing the least; 7; 
+
+
+#6. Create margin plot or BMI and income to see how missing values on one variable relate to values on another variable. Comment on what you see.
+```{r}
+marginplot(df %>% select(bmi, income), # argument gives the dataset and selects variables to be examined 
+           cex=1, # gives the size of the points 
+           cex.lab=1, # gives the size of the axis labels 
+           cex.numbers=0.7, # cex.numbers gives the size of the numbers 
+           pch=20) # pch gives the symbol for the points
+```
+#6. Answer: BMI is super high with a few extreme outliers. Not sure how they relate?
+
+
+
+#7. Conduct the imputation creating 10 imputation dataframes and setting the seed as 600. Print the imputation results. Note if it does not work for you, try looking up how to remove the labels from the df (using the sjlabelled package) and then rerun the imputation code. What method was used to impute BMI?
+
+```{r}
+imp <- mice(df, # dataframe
+            m = 10, # number of imputations, 5 is default,  5-10 is usually enough but some set it to the number of variables being imputed. 
+            maxit = 5, # number of imputations got get the imputation model to converge. The default is 5
+            seed = 600) # set so that everytime you run this code you get the same imputation datasets. Number is arbitrary
+imp
+```
+#7 Answer: method was "ppm"
+
+
+#8. Diagnostics for imputation model: Are the imputed values plausible for BMI plausible (determine qualitatively by printing the imputed values)? The below shows the code for printing a variable within a dataframe called imp within the imp list. Comment on plausibility.
+```{r}
+head(imp$imp$bmi)
+```
+#8 Answer:Yes matches what is found on df
+
+
+
+#9. Obtain the long dataframe with all the imputation dataframes and plot a box plot of BMI by imputation. Note: use x = as.factor(.imp) with backticks around .imp as the x variable for ggplot. Describe any notable differences (if any) between box plots.
+```{r}
+longimp <- mice::complete(data=imp, action="long") # To get all the imputations in one dataframe provide the action "long". Two columns are added: 1) .imp, integer, referring the imputation number, and 2) .id, integer, the id number in the original dataframe
+
+longimp
+```
+
+
+
+#10. Use stripplot to look at scatterplots of BMI by imputation. Do you see any notable patterns between imputations? Are the imputed data points within the range of the non-imputed data points?
+```{r}
+stripplot(imp_alter, 
+          bmi~.imp, 
+          jit=TRUE, 
+          pch=c(1,20), 
+          xlab="Blue = Non-missing, Imputation number")
+```
+
+#11. Run a linear regression using the non-imputed dataframe (i.e. a complete case analysis) modeling BMI as a function of income and two other predictors of your choice. Get a summary of the results.
+```{r}
+fit <- lm(data = df, 
+          bmi ~ age + race) 
+nobs(fit) 
+
+fit
+summary(fit) # get model summary results
+```
+
+
+
+#12. Now run a linear regression using the imputed data with the same variables as above. Pool the regression coefficents and standard errors and obtain a summary.
+```{r}
+fit_i <-with(imp, lm(bmi~age +race)) 
+summary(fit_i)
+```
+
+
+#13. Compare the income coefficients between the complete case analysis and the imputed data analysis qualitatively and comment on whether there are any meaningful differences
+#13 Answer: Age between the two fit and fit_i are very similar only a .1
+
+
+
+
+
+
