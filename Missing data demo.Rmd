@@ -1,0 +1,299 @@
+---
+title: "Missing data demo"
+author: "Kim Johnson"
+date: 
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+## Let's see how this works using the R MICE (Multiple Imputation by Chained Equations) package and the NHANES dataset that is provided with the package.
+
+```{r}
+# VIM package for plotting missing data patterns
+# mice package for imputing missing data
+# lattice for plotting to look at quality of imputations using stripplot
+# dplyr for data management/sub-setting functions
+
+pacman::p_load(VIM, mice, lattice, dplyr)
+```
+
+## Load builtin nhanes2 data and look at NAs. Are there any patterns to the missing data on visual inspection?
+
+```{r, eval=FALSE}
+nhanes2 <- nhanes2 # a dataset from nhanes of 25 observations containing age, bmi, hypertension and cholesterol variables
+
+View(nhanes2)
+
+summary(nhanes2)
+```
+
+## Look at missing data patterns using the md.pattern function
+
+```{r}
+md.pattern(nhanes2, rotate.names=TRUE)
+```
+
+-   blue = not missing, red = missing
+
+-   The numbers in the left column are the number of observations with
+    each pattern
+
+-   The numbers in the right column are the numbers of variables missing
+    for that pattern
+
+-   The number in the bottom row is the number of observations with
+    missing values for the variable indicated in the top row
+
+-   The number in the bottom right corner is the total number of missing
+    values in the dataset
+
+-   13/25 rows (i.e. observations) are complete as indicated by all 1s
+    for the first row
+
+-   3/25 rows have missing data on chl as indicated by the 0 for chl in
+    the second row
+
+-   1/25 row has missing data on bmi
+
+-   1/25 row has missing data on hyp and bmi
+
+-   7/25 rows have missing data on hyp, bmi, and chl (i.e. 3 missing
+    data points for each of the 7 people)
+
+-   There are a total of 5 missing data patterns in the dataset
+
+-   How many people have at least one missing data point? 12 (3 + 1 +1 +
+
+    7)  
+
+-   How many missing values are there in the entire dataset? 27
+
+-   How many have no missing data points? 13
+
+## Create margin plot (VIM package) to see how missing values on one variable relate to values on another variable. We will do this for cholesterol (chl) and bmi
+
+```{r}
+marginplot(nhanes2 %>% select(chl, bmi), # argument gives the dataset and selects variables to be examined 
+           cex=1, # gives the size of the points 
+           cex.lab=1, # gives the size of the axis labels 
+           cex.numbers=0.7, # cex.numbers gives the size of the numbers 
+           pch=20) # pch gives the symbol for the points
+```
+
+**What does it mean for this plot?** - Blue dots in the scatterplot
+represent observed values for both bmi and chl (n=13) - The three red
+dots on the vertical axis represent observed values for bmi that are
+missing for chl - The two red dots on the horizontal axis indicate
+observed values for chl that are missing for bmi - The maroon 7
+indicates 7 records for which both bmi and chl are missing. It
+corresponds to the maroon dot where we don't have any data for both bmi
+or chl - The red 9 is the total number of records missing bmi (7 records
+missing data for both bmi and chl + 2 records missing data for bmi) -
+The red 10 is the total number of records missing chl (7 records missng
+data for both bmi and chl + 3 records missing data for chl) - The blue
+and red box plots are distributions for missing and non-missing data on
+chl (y-axis) and bmi (x-axis).
+
+## Look at the distribution of one variable according to missing non-missing status for another variable using pbox (VIM package)
+
+-   pbox gives box plots of a variable (bmi) according to missing and
+    non-missing categories of a second variable (hypertension and
+    cholesterol). pos corresponds to the column number for the y-axis
+    variable which for bmi is column 2.
+-   What do we see in this graph?
+
+```{r}
+pbox(nhanes2, pos=2) # 2 is the column index (the number of the column from left to right)
+```
+
+## Imputing data with the mice function from the MICE package. All values that are missing are imputed using the other variables as predictors. There are ways to leave some variables out of the imputation (refer to resource: <https://www.jstatsoft.org/article/view/v045i03>)
+
+```{r}
+imp <- mice(nhanes2, # dataframe
+            m = 10, # number of imputations, 5 is default,  5-10 is usually enough but some set it to the number of variables being imputed. 
+            maxit = 5, # number of imputations got get the imputation model to converge. The default is 5
+            seed = 1000000) # set so that everytime you run this code you get the same imputation datasets. Number is arbitrary
+imp
+```
+
+-   Iter is the iteration number for the model that is predicting a
+    value for each of the missing data points.
+-   Imp is the imputation dataset number. You get the last iterations
+    set of imputation datasets.
+-   Imputations are generated by the default method for numerical
+    variables, which is called **pmm** or predictive mean matching, For
+    more information on PMM, see:
+    <https://statisticalhorizons.com/predictive-mean-matching>. For bmi
+    and chl pmm is used because these are both numeric. For hyp,
+    logistic regression is used because it is a binary variable.
+-   The PredictorMatrix tells you what variables are being used to
+    predict others. Age is not missing so nothing is being used to
+    predict age. bmi is missing so age, hyp, and chl are being used to
+    predict bmi, hyp is missing so age, bmi and chl are being used to
+    predict hyp and so on. For more information on what VisitSequence
+    (the order which variables are imputed, which by default is left to
+    right in the dataset) and PredictorMatrix, I refer to the excellent
+    documentation in the MICE package
+    (<https://www.jstatsoft.org/article/view/v045i03>).
+
+# What is the class of the imputation object (refer back to lecture image)
+
+-   mids are the imputation datasets
+
+```{r}
+class(imp)
+```
+
+## Diagnostics for imputation model: Are the imputed values plausible?
+
+```{r}
+# check age
+imp$imp$age # imp$imp refers to the list that holds the dataframes with the imputed values for each variable (both called imp) (age, bmi, hyp, chl). To view this click on imp in your global environment
+
+# check BMI
+imp$imp$bmi
+
+# check hyp
+imp$imp$hyp
+
+# check chl
+imp$imp$chl
+# the rows contain the imputed values and the columns are the multiple imputations
+```
+
+## Obtain the first complete dataset in a normal dataframe for review using the complete function from the mice package
+
+```{r}
+imp1 <- mice::complete(data=imp, action=1) # action gives the imputation number you want. In this case the first imputation dataframe
+imp1
+
+longimp <- mice::complete(data=imp, action="long") # To get all the imputations in one dataframe provide the action "long". Two columns are added: 1) .imp, integer, referring the imputation number, and 2) .id, integer, the id number in the original dataframe
+
+longimp
+# To read more about the complete function, type help(complete.mids) or search complete.mids in the help function
+```
+
+## Let's look at the imputed compared to the non-imputed data to see how the distributions compare using the function stripplot that plots the values for the imputed data and complete data in "strips"
+
+```{r}
+stripplot(x = imp, # mids object
+          data = age + chl + hyp + bmi ~.imp, # formula to be plotted, ~.imp can be read as columns by imputation number
+          jit=TRUE, # jitters overlapping points
+          pch=c(1,20), # pch gives the symbol to use 
+          xlab ="Blue = Non-missing, Imputation number")  # give a label to the x-axis
+```
+
+## Let's alter the method for bmi and see what happens to stripplot for fun
+
+```{r}
+# imp_alter <- mice(nhanes2, 
+                  # m=5, 
+                  # maxit=5, 
+                  # seed=219,  
+                  # meth = c("",  "logreg", "pmm",  "pmm" ))  # used to specify method but doesn't work--why?
+
+imp_alter<-mice(nhanes2, 
+                m=10, 
+                maxit=5, seed=219,  
+                meth = c("",  "mean", "logreg",  "pmm" )) # imputes the mean bmi
+imp_alter
+
+stripplot(imp_alter, 
+          bmi~.imp, 
+          jit=TRUE, 
+          pch=c(1,20), 
+          xlab="Blue = Non-missing, Imputation number")
+```
+
+## Analysis of complete data using a linear regression model
+
+-   The below model is for the nhanes dataframe that has missing values
+
+```{r}
+fit <- lm(data = nhanes2, 
+          chl ~ age + bmi) # run a simple linear regression modeling the mean cholesterol as a function of age and bmi
+
+nobs(fit) # What does the number 13 correspond to?
+
+fit
+summary(fit) # get model summary results
+```
+
+## Not let's run the regression with the imputed data
+
+-   get regression coefficients for all models using the *with* function
+    from the mice package. Recall there will be 10 sets of regression
+    coefficients and 10 intercepts because there are 10 imputed datasets
+    in imp
+
+```{r}
+fit_i <-with(imp, lm(chl~age +bmi)) # use with function to get mira results (refer back to lecture figure)
+summary(fit_i)
+```
+
+## Because we have 10 estimates we need to pool the data. pool(model object name) is used to pool regression coefficients and standard errors.
+
+```{r}
+fit_i <- summary(pool(fit_i)) # get summary of pooled estimates.
+fit_i
+```
+
+# you can calculate the CI with the formula:
+
+# CI = estimate +/- 1.96\*SE
+
+```{r}
+term <- fit_i$term # Extract term
+term
+
+estimates <- fit_i$estimate # Extract coefficients and standard errors
+estimates
+
+std.err <- fit_i$std.error # Extract standard errors
+std.err
+
+
+lower_bound <- estimates - 1.96 * std.err # Calculate lower confidence interval
+upper_bound <- estimates + 1.96 * std.err # Calculate upper confidence interval
+
+lower_bound
+upper_bound
+
+# Combine results into a data frame
+ci_results <- data.frame(
+  Term = term,
+  Estimate = estimates,
+  Lower_CI = lower_bound,
+  Upper_CI = upper_bound
+)
+
+print(ci_results)
+```
+
+## How does the imputed data compare to the non-imputed data analysis? How different are the coefficients?
+
+```{r}
+# We can test this by running a model with the non-imputed data and comparing to above results
+Complete_case<-lm(chl~age +bmi, data=nhanes2)
+summary(Complete_case)
+
+# bmi = 6.921 # for every one unit increase in bmi, the mean cholesterol increases by 6.921
+# This compares to the imputed data value for the bmi beta of 5.69. a bit biased away from the null in the complete case analysis assuming that the data are MAR. 
+```
+
+## Code for applying the Wald-test and lr test to the imputed datasets to see if hypertension improves model fit.
+
+```{r}
+# Compare models with and without hypertension and then use the pool.compare function
+fit0 <-with(imp, lm(chl~age + bmi)) 
+summary(fit0)
+
+fit1 <-with(imp, lm(chl~age +bmi + hyp))
+summary(fit1)
+
+D1(fit1, fit0) # multivariable wald statistic used to compare two nested models (they are all the same observations). 
+
+# Use D3 for LR test (see mice documentation)
+```
